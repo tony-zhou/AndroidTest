@@ -13,10 +13,13 @@ class Remedy(object):
     def __init__(self):
         self.path = os.path.dirname(os.path.abspath(__file__))
         self.error_type = ["data_app_anr", "data_app_crash"]
-        self.device_id = ""
+        self.device_id = Common.gen_devices_id(single=True)[0]
 
     def get_log(self):
-        self.device_id = Common.gen_devices_id(single=True)[0]
+        """
+        Main method for dump log
+        :return: None
+        """
         device_info = '_'.join(Common.gen_device_info(self.device_id)).replace(' ', '_')
         log_path = os.path.join(self.path, *['Log', device_info])
         for item in self.error_type:
@@ -39,6 +42,12 @@ class Remedy(object):
                 Common.print_log("there is no valid %s log !" % item.split('_')[2])
 
     def write_log(self, path, error):
+        """
+        Use "dumpsys dropbox --print" to write error log to file
+        :param path: log path
+        :param error: error timestamp
+        :return: None
+        """
         file_name = error.replace(':', '-').replace(' ', '_')
         log_file = os.path.join(path, ''.join([file_name, '.txt']))
         if not os.path.exists(log_file):
@@ -49,6 +58,13 @@ class Remedy(object):
                 file.close()
 
     def dump_log(self, path, error, item):
+        """
+        Dump logcat buffer to local file and if error type is anr, copy traces.txt to local path
+        :param path: log path
+        :param error: error timestamp
+        :param item: error type
+        :return: None
+        """
         file_name = ''.join([error.replace(':', '-').replace(' ', '_'), 'logcat.txt'])
         log_file = os.path.join(path, file_name)
         if not os.path.exists(log_file):
@@ -62,6 +78,11 @@ class Remedy(object):
                 Common.adb(self.device_id, cmd)
 
     def gen_error_list(self, error_type):
+        """
+        Get error timestamp list according to the error type
+        :param error_type: 'data_app_anr' or 'data_app_crash'
+        :return: error list as ['2015-11-24 09:59:38']
+        """
         error_list = []
         cmd = 'dumpsys dropbox'
         response = Common.adb_shell(cmd, self.device_id)[0]
@@ -80,6 +101,12 @@ class Remedy(object):
             return error_list
 
     def need_to_dump_log(self, time_stamp):
+        """
+        Compare mobile time when issue happened with PC current local time.
+        If the time gap are less than 180s, return True, else False.
+        :param time_stamp: mobile time when issue happened
+        :return: True or False
+        """
         log_unix_time = int(time.mktime(time.strptime(time_stamp, '%Y-%m-%d %H:%M:%S')))
         cmd = 'date +%s'
         current_unix_time = Common.adb_shell(cmd, self.device_id)
