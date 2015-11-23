@@ -1,0 +1,7 @@
+Instruction:
+
+1. Before use this script, please make sure you have set adb environment path.
+
+2. This script is used to generator the error log after issue happened.
+
+3. This script is used with python3
