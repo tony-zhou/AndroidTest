@@ -47,19 +47,15 @@ class Common(object):
 
     @staticmethod
     def gen_device_info(device_id):
-        model = ''
-        brand = ''
-        Common.print_log("start to get device info")
-        cmd = 'cat /system/build.prop'
-        device_info = Common.adb_shell(cmd, device_id)[0].strip().split('\n')
-        for detail_info in device_info:
-            if 'product.brand' in detail_info:
-                brand = detail_info.strip()[detail_info.find('=') + 1:]
-            elif 'product.model' in detail_info:
-                model = detail_info.strip()[detail_info.find('=') + 1:]
+        Common.print_log('start to get device info', device_id)
+        info = Common.command('adb -s %s shell getprop' % device_id)
+        device_info = info[0].strip()
+        brand_pattern = "\[ro.product.brand\].*?\[(.*?)\]"
+        model_pattern = "\[ro.product.model\].*?\[(.*?)\]"
+        brand = re.findall(brand_pattern, device_info)[0]
+        model = re.findall(model_pattern, device_info)[0]
         if not bool(model):
             model = device_id
-        print("device info is got as %s %s" % (brand.upper(), model.upper()))
         return brand.upper(), model.upper()
 
     @staticmethod
