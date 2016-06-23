@@ -12,7 +12,7 @@ class Remedy(object):
 
     def __init__(self):
         self.path = os.path.dirname(os.path.abspath(__file__))
-        self.error_type = ["data_app_anr", "data_app_crash"]
+        self.error_type = ["latest", "data_app_anr", "data_app_crash"]
         self.device_id = Common.gen_devices_id(single=True)[0]
 
     def get_log(self):
@@ -22,19 +22,22 @@ class Remedy(object):
         """
         device_info = '_'.join(Common.gen_device_info(self.device_id)).replace(' ', '_')
         log_path = os.path.join(self.path, *['Log', device_info])
+        error_dict = self.gen_error_dict()
+        latest_event = error_dict["latest"]
         for item in self.error_type:
-            error_list = self.gen_error_list(item)
+            error_list = error_dict[item]
             Common.print_log("start to get %s log" % item.split('_')[2])
-            if bool(error_list):
+            if error_list:
                 item_path = os.path.join(log_path, ''.join(['Log_', item.split('_')[2]]))
-                latest_path = os.path.join(item_path, 'Latest')
                 Common.confirm_path(item_path, update=False)
-                Common.confirm_path(latest_path, update=True)
-                self.write_log(latest_path, error_list[0])
-                if self.need_to_dump_log(error_list[0]):
-                    self.dump_log(latest_path, error_list[0], item)
-                if len(error_list) > 1:
-                    for e in error_list[1:]:
+                for e in error_list:
+                    if e == latest_event:
+                        latest_path = os.path.join(log_path, 'Latest')
+                        Common.confirm_path(latest_path, update=True)
+                        self.write_log(latest_path, e)
+                        if self.need_to_dump_log(e):
+                            self.dump_log(latest_path, e, item)
+                    else:
                         self.write_log(item_path, e)
                 print(u"{0:s} logs are successfully exported !".format(
                     ''.join([item.split('_')[2][0].upper(), item.split('_')[2][1:].lower()])))
@@ -77,28 +80,30 @@ class Remedy(object):
                 cmd = u'pull {0:s} {1:s}'.format('/data/anr/traces.txt', path)
                 Common.adb(self.device_id, cmd)
 
-    def gen_error_list(self, error_type):
+    def gen_error_dict(self):
         """
         Get error timestamp list according to the error type
-        :param error_type: 'data_app_anr' or 'data_app_crash'
-        :return: error list as ['2015-11-24 09:59:38']
+        :return: error dict as {"data_app_crash": ['2015-11-24 09:59:38'], "data_app_anr": ['2016-06-20 16:40:35']}
         """
-        error_list = []
+        error_dict = {x: [] for x in self.error_type}
         cmd = 'dumpsys dropbox'
         response = Common.adb_shell(cmd, self.device_id)[0]
         if not bool(response):
-            return False
+            return error_dict
         else:
-            result = [x for x in response.strip().split('\n') if error_type in x]
+            result = [x for x in response.strip().split('\n') if [y for y in self.error_type if y in x]]
+            result.sort(reverse=True)
             if result == ['']:
-                return False
+                return error_dict
             else:
+                error_dict['latest'] = ' '.join(result[0].split(" ")[0:2])
+                self.error_type.remove('latest')
                 for item in result:
-                    if 'contents lost' not in item:
-                        time_stamp = ' '.join([item.split(" ")[0], item.split(" ")[1]])
-                        error_list.append(time_stamp)
-            error_list.sort(reverse=True)
-            return error_list
+                    for error in self.error_type:
+                        if 'contents lost' not in item:
+                            if error in item:
+                                error_dict[error].append(' '.join(item.split(" ")[0:2]))
+            return error_dict
 
     def need_to_dump_log(self, time_stamp):
         """

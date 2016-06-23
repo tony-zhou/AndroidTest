@@ -133,6 +133,7 @@ class Common(object):
             if update:
                 try:
                     shutil.rmtree(path)
+                    os.mkdir(path)
                 except IOError:
                     Common.print_log('delete files in {0:s} fail, please close it and retry'.format(path))
                     exit()
